@@ -1,22 +1,40 @@
-import React, { useState } from 'react';
-import logo from './logo.svg';
+import React, { useEffect, useMemo, useState } from 'react';
 import './App.css';
-import { useMoralis } from "react-moralis";
+import useInchDex from './hooks/useInchDex';
+import { useMoralis,useTokenPrice } from "react-moralis";
 import { Box, Button, Container, Flex, Input, InputGroup, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, Spacer, Text, useDisclosure } from '@chakra-ui/react';
 import { ArrowDownIcon, ChevronDownIcon } from '@chakra-ui/icons';
-
+import { getWrappedNative } from './helpers/networks';
 
 
 function App() {
-
-    const { authenticate, isAuthenticated, isAuthenticating, user, account, logout } = useMoralis();
+    const customTokens = {}
+    const { trySwap, tokenList, getQuote } = useInchDex("eth");
+    const { Moralis,isInitialized,chainId,authenticate, isAuthenticated, isAuthenticating, user, account, logout } = useMoralis();
     const {isOpen,onOpen,onClose} = useDisclosure();
     const [isFromTokenActive,setFromTokenActive] = useState(false);
     const [isToTokenActive,setToTokenActive] = useState(false);
-    const login = async () => {
-      if (!isAuthenticated) {
+    const [fromToken, setFromToken] = useState("");
+    const [toToken, setToToken] = useState("");
+    const [fromAmount, setFromAmount] = useState();
+    const [quote, setQuote] = useState();
+    const [currentTrade, setCurrentTrade] = useState();
+    const [tokenPricesUSD, setTokenPricesUSD] = useState({});
+    const { fetchTokenPrice, data: formattedData, error, isLoading, isFetching } = useTokenPrice({ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", chain: "eth" });
 
-        await authenticate({signingMessage: "Log in using Web3" })
+
+    const init = async () => {
+      Moralis.initPlugins()
+      Moralis.enableWeb3();
+
+    }
+
+    const login = async (wallet : any) => {
+      if (!isAuthenticated) {
+        await authenticate({
+          signingMessage: "Log in using Web3",
+          provider: wallet,
+        })
           .then(function (user) {
             localStorage.setItem('address',user!.get("ethAddress"));
           })
@@ -50,7 +68,8 @@ function App() {
                     </ModalHeader>
                     <ModalCloseButton/>
                     <ModalBody>
-                      <Button onClick={login}>MetaMask</Button>
+                      <Button onClick={() => login("metamask")}>MetaMask</Button>
+                      <Button onClick={() => login("walletConnect")}>WalletConnect</Button>
                     </ModalBody>
                     <ModalFooter>
                       <Button colorScheme="blue" mr={3} onClick={onClose}>Close</Button>
