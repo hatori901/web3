@@ -45,6 +45,7 @@ function App() {
     }
     const logOut = async () => {
       await logout();
+      localStorage.removeItem('address');
       console.log("logged out");
     }
   return (
