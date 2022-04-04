@@ -69,7 +69,7 @@ function App() {
                     <ModalCloseButton/>
                     <ModalBody>
                       <Button onClick={() => login("metamask")}>MetaMask</Button>
-                      <Button onClick={() => login("walletConnect")}>WalletConnect</Button>
+                      <Button onClick={() => login("walletconnect")}>WalletConnect</Button>
                     </ModalBody>
                     <ModalFooter>
                       <Button colorScheme="blue" mr={3} onClick={onClose}>Close</Button>
