@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import useInchDex from './hooks/useInchDex';
-import { useMoralis,useTokenPrice } from "react-moralis";
+import { useMoralis,useTokenPrice,useOneInchTokens } from "react-moralis";
 import { Box, Button, Container, Flex, Input, InputGroup, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, Spacer, Text, useDisclosure } from '@chakra-ui/react';
 import { ArrowDownIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import InchModal from "./components/InchModal";
 import { getWrappedNative } from './helpers/networks';
 
 
 function App() {
     const customTokens = {}
-    const { trySwap, tokenList, getQuote } = useInchDex("eth");
+    // const { trySwap, tokenList, getQuote } = useInchDex("eth");
     const { Moralis,isInitialized,chainId,authenticate, isAuthenticated, isAuthenticating, user, account, logout } = useMoralis();
     const {isOpen,onOpen,onClose} = useDisclosure();
     const [isFromTokenActive,setFromTokenActive] = useState(false);
@@ -20,23 +21,25 @@ function App() {
     const [quote, setQuote] = useState();
     const [currentTrade, setCurrentTrade] = useState();
     const [tokenPricesUSD, setTokenPricesUSD] = useState({});
-    const { fetchTokenPrice, data: formattedData, error, isLoading, isFetching } = useTokenPrice({ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", chain: "eth" });
 
-
-    const init = async () => {
-      Moralis.initPlugins()
-      Moralis.enableWeb3();
-
+    const [tokenList,setTokenList] = useState();
+    const chain = "eth"
+    const getToken = async () =>{
+      Moralis.Plugins.oneInch.getSupportedTokens({chain})
+      .then((tokens) => setTokenList(tokens.tokens));
     }
 
     const login = async (wallet : any) => {
+      
       if (!isAuthenticated) {
+        
         await authenticate({
           signingMessage: "Log in using Web3",
           provider: wallet,
         })
           .then(function (user) {
             localStorage.setItem('address',user!.get("ethAddress"));
+            getToken()
           })
           .catch(function (error) {
             console.log(error);
@@ -105,7 +108,12 @@ function App() {
             <ModalHeader>Select a Token</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <p>test</p>
+            <InchModal
+              open={isFromTokenActive}
+              onClose={() => setFromTokenActive(false)}
+              setToken={setFromToken}
+              tokenList={tokenList}
+            />
             </ModalBody>
           </ModalContent>
         </Modal>
@@ -125,7 +133,12 @@ function App() {
               <ModalHeader>Select a Token</ModalHeader>
               <ModalCloseButton />
               <ModalBody>
-                <p>test</p>
+              <InchModal
+                open={isToTokenActive}
+                onClose={() => setToTokenActive(false)}
+                setToken={setToToken}
+                tokenList={tokenList}
+              />
               </ModalBody>
             </ModalContent>
           </Modal>

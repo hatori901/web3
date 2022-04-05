@@ -6,11 +6,11 @@ const useInchDex = (chain) => {
     const [tokenList,setTokenList] = useState();
     
     useEffect(() =>{
-        if(!Moralis?.["Plugins"]?.["oneInch"]) return null;
+        if(!Moralis?.["Plugins"]?.["oneInch"]) return "langka";
         Moralis.Plugins.oneInch
-            .getSupportedTokens({chain})
+            .getSupportedTokens({chain: "eth"})
             .then((tokens) => setTokenList(tokens.tokens))
-    },[Moralis,Moralis.Plugins,chain]);
+    },[Moralis,Moralis.Plugins]);
 
     const getQuote = async (params) => {
         await Moralis.Plugins.oneInch.quote({
