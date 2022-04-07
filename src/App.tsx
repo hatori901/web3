@@ -211,7 +211,7 @@ function App() {
                 alignItems: "center"
               }}>
                 <Text>To</Text>
-                <Text fontWeight="bold">Balance: {tokenValue(toToken["balance"],toToken["decimals"]).toFixed(4)}</Text>
+                <Text fontWeight="bold">Balance: {!toToken["balance"] ? 0 : tokenValue(toToken["balance"],toToken["decimals"]).toFixed(4)}</Text>
               </div>
             ) : (
               <Text>To</Text>
