@@ -1,4 +1,5 @@
 import React from "react";
+import { tokenValue } from "../helpers/formatters";
 
 function InchModal({ open, onClose, setToken, tokenList }) {
   if (!open) return null;
@@ -8,39 +9,48 @@ function InchModal({ open, onClose, setToken, tokenList }) {
       {!tokenList
         ? null
         : Object.keys(tokenList).map((token, index) => (
-            <div
-              style={{
+            <div style={{
+                display:"flex",
+                justifyContent:"space-between",
+                alignItems:"center",
                 padding: "5px 20px",
-                display: "flex",
-                alignItems: "center",
                 cursor: "pointer",
-              }}
-              onClick={() => {
-                setToken(tokenList[token]);
-                onClose();
-              }}
-              key={index}
-            >
-              <img
+            }} key={index}
+            onClick={() => {
+              setToken(tokenList[token]);
+              onClose();
+            }}>
+              <div
                 style={{
-                  height: "32px",
-                  width: "32px",
-                  marginRight: "20px",
+                  display: "flex",
+                  alignItems: "center",
                 }}
-                src={tokenList[token].logoURI}
-                alt="noLogo"
-              />
-              <div>
-                <h4>{tokenList[token].name}</h4>
-                <span
+                
+              >
+                <img
                   style={{
-                    fontWeight: "600",
-                    fontSize: "15px",
-                    lineHeight: "14px",
+                    height: "32px",
+                    width: "32px",
+                    marginRight: "20px",
                   }}
-                >
-                  {tokenList[token].symbol}
-                </span>
+                  src={tokenList[token].logoURI || "https://etherscan.io/images/main/empty-token.png"}
+                  alt="noLogo"
+                />
+                <div>
+                  <h4>{tokenList[token].name}</h4>
+                  <span
+                    style={{
+                      fontWeight: "600",
+                      fontSize: "15px",
+                      lineHeight: "14px",
+                    }}
+                  >
+                    {tokenList[token].symbol}
+                  </span>
+                </div>
+              </div>
+              <div>
+                  <h4>{tokenValue(tokenList[token].balance,tokenList[token].decimals) || 0}</h4>
               </div>
             </div>
           ))}

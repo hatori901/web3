@@ -1,55 +1,75 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import useInchDex from './hooks/useInchDex';
-import { useMoralis,useTokenPrice } from "react-moralis";
+import { useMoralis,useTokenPrice,useMoralisWeb3Api } from "react-moralis";
 import { Box, Button, Container, Flex, Image, Input, InputGroup, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, Spacer, Text, useDisclosure } from '@chakra-ui/react';
 import { ArrowDownIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import InchModal from "./components/InchModal";
 import { getWrappedNative } from './helpers/networks';
+import { tokenValue } from "./helpers/formatters";
 import { log } from 'console';
 
 
 function App() {
-    const customTokens = {}
+    const [customTokens,setCustomTokens] = useState({});
     const chain = "eth"
     // const { trySwap, tokenList, getQuote } = useInchDex("eth");
     const { Moralis,isInitialized,chainId,authenticate, isAuthenticated, isAuthenticating, user, account, logout } = useMoralis();
+    const Web3Api = useMoralisWeb3Api();
     const {isOpen,onOpen,onClose} = useDisclosure();
     const [isFromTokenActive,setFromTokenActive] = useState(false);
     const [isToTokenActive,setToTokenActive] = useState(false);
     const [fromToken, setFromToken] = useState();
     const [toToken, setToToken] = useState();
-    const [fromAmount, setFromAmount] = useState();
+    const [fromAmount, setFromAmount] = useState<number>();
     const [quote, setQuote] = useState();
     const [currentTrade, setCurrentTrade] = useState();
     const [tokenPricesUSD, setTokenPricesUSD] = useState({});
-    const { fetchTokenPrice, data: formattedData, error, isLoading, isFetching } = useTokenPrice({ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", chain: "eth" });
-    const [tokenList,setTokenList] = useState();
+    const { fetchTokenPrice, data: formattedData, error, isLoading, isFetching } = useTokenPrice({ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", chain });
+    const [tokenList,setTokenList] = useState({});
     
     const getToken = async () =>{
       Moralis.Plugins.oneInch.getSupportedTokens({chain})
       .then((tokens) => setTokenList(tokens.tokens));
     }
+    const getCustomTokens = async ()=>{
+      await Web3Api.account.getTokenBalances({address:localStorage.getItem('address'),chain}).then((tokens)=> setCustomTokens(tokens))
+    }
+    const tokens = useMemo(()=>{
+      return {...customTokens,...tokenList}
+    },[customTokens,tokenList])
     
     const getPriceFromToken = async () =>{
       if(!fromToken) return null;
-      fetchTokenPrice({params:{address:fromToken["address"], chain:"eth"}})
-      .then((price)=>setTokenPricesUSD({
-        [fromToken["address"]]: price["usdPrice"],
-      }))
+      const addressToken = fromToken["address"] || fromToken["token_address"]
+      fetchTokenPrice({params:{address: addressToken, chain}}).then((e)=> console.log(e))
     }
+    // useEffect(() =>{
+    //   if(!fromToken) return null;
+    //   const addressToken = fromToken["address"] || fromToken["token_address"]
+    //   fetchTokenPrice({
+    //     params:{address:addressToken, chain},
+    //     onSuccess: (price) => {
+    //       setTokenPricesUSD({
+    //         ...tokenPricesUSD,
+    //         [fromToken["address"]] : price["usdPrice"]
+    //       })
+    //     }
+    //   })
+    // },[fromToken])
     const getPriceToToken = async () =>{
       if(!toToken) return null;
-      fetchTokenPrice({params:{address:toToken["address"], chain:"eth"}})
+      fetchTokenPrice({params:{address:toToken["address"], chain}})
       .then((price)=>setTokenPricesUSD({
+        ...tokenPricesUSD,
         [toToken["address"]]: price["usdPrice"],
       }))
     }
 
-    // const fromTokenPriceUsd = useMemo(
-    //   ()=>
-    //   tokenPricesUSD["fromToken"]["address"]
-    // ,[tokenPricesUSD,fromToken])
+    const fromTokenPriceUsd = useMemo(
+      ()=>
+      tokenPricesUSD
+    ,[tokenPricesUSD,fromToken])
 
     // const toTokenPriceUsd = useMemo(
     // ()=> 
@@ -61,7 +81,8 @@ function App() {
     //   return `~$ ${(fromAmount * fromTokenPriceUsd).toFixed(4)}`
     // },[fromTokenPriceUsd,fromAmount])
 
-    //  
+    
+
     const login = async (wallet : any) => {
       
       if (!isAuthenticated) {
@@ -73,6 +94,7 @@ function App() {
           .then(function (user) {
             localStorage.setItem('address',user!.get("ethAddress"));
             getToken()
+            getCustomTokens()
           })
           .catch(function (error) {
             console.log(error);
@@ -130,9 +152,20 @@ function App() {
           </Box>
         </Flex>
         <Container background="blackAlpha.600" rounded="md" shadow="md" padding="10px">
-          <Text fontWeight="bold" fontSize="md">From</Text>
+          {fromToken ? (
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
+              <Text>From</Text>
+              <Text fontWeight="bold">Balance: {!fromToken["balance"] ? 0 : tokenValue(fromToken["balance"],fromToken["decimals"]).toFixed(4)}</Text>
+            </div>
+          ) : (
+            <Text>From</Text>
+          )}
           <InputGroup>
-          <Input fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5"/>
+          <Input value={fromAmount} onChange={()=> getPriceFromToken} fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5"/>
           <Button onClick={() => setFromTokenActive(true)}>{fromToken ? (
             <Image
               src={fromToken["logoURI"] ||
@@ -151,7 +184,7 @@ function App() {
           )}          
           <ChevronDownIcon w="6" h="6"/></Button>
           </InputGroup>
-          <Modal isOpen={isFromTokenActive} onClose={() => setFromTokenActive(false)}>
+          <Modal isOpen={isFromTokenActive} onClose={() => setFromTokenActive(false)} size="xl">
           <ModalOverlay />
           <ModalContent>
             <ModalHeader>Select a Token</ModalHeader>
@@ -161,7 +194,7 @@ function App() {
               open={isFromTokenActive}
               onClose={() => setFromTokenActive(false)}
               setToken={setFromToken}
-              tokenList={tokenList}
+              tokenList={tokens}
             />
             </ModalBody>
           </ModalContent>
@@ -171,7 +204,18 @@ function App() {
           <ArrowDownIcon w="8" h="8"/>
         </div>
         <Container background="blackAlpha.600" rounded="md" shadow="lg" padding="10px">
-          <Text fontWeight="bold" fontSize="md">To</Text>
+          {toToken ? (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}>
+                <Text>To</Text>
+                <Text fontWeight="bold">Balance: {tokenValue(toToken["balance"],toToken["decimals"]).toFixed(4)}</Text>
+              </div>
+            ) : (
+              <Text>To</Text>
+            )}
           <InputGroup>
             <Input fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5"/>
             <Button onClick={() => setToTokenActive(true)}>{toToken ? (
@@ -193,7 +237,7 @@ function App() {
           <ChevronDownIcon w="6" h="6"/></Button>
           </InputGroup>
           
-          <Modal isOpen={isToTokenActive} onClose={() => setToTokenActive(false)}>
+          <Modal isOpen={isToTokenActive} onClose={() => setToTokenActive(false)} size="xl">
             <ModalOverlay />
             <ModalContent>
               <ModalHeader>Select a Token</ModalHeader>
@@ -203,7 +247,7 @@ function App() {
                 open={isToTokenActive}
                 onClose={() => setToTokenActive(false)}
                 setToken={setToToken}
-                tokenList={tokenList}
+                tokenList={tokens}
               />
               </ModalBody>
             </ModalContent>
