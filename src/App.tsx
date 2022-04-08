@@ -21,17 +21,19 @@ function App() {
     const [isToTokenActive,setToTokenActive] = useState(false);
     const [fromToken, setFromToken] = useState();
     const [toToken, setToToken] = useState();
-    const [fromAmount, setFromAmount] = useState<number>();
+    const [fromAmount, setFromAmount] = useState(0);
     const [quote, setQuote] = useState();
     const [currentTrade, setCurrentTrade] = useState();
     const [tokenPricesUSD, setTokenPricesUSD] = useState({});
     const { fetchTokenPrice, data: formattedData, error, isLoading, isFetching } = useTokenPrice({ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", chain });
     const [tokenList,setTokenList] = useState({});
     
-    const getToken = async () =>{
-      Moralis.Plugins.oneInch.getSupportedTokens({chain})
-      .then((tokens) => setTokenList(tokens.tokens));
-    }
+    useEffect(()=>{
+        if(!Moralis?.["Plugins"]?.["oneInch"]){
+          return
+        }
+        Moralis.Plugins.oneInch.getSupportedTokens({chain}).then((tokens)=> setTokenList(tokens.tokens))
+    },[Moralis,Moralis.Plugins,Moralis.Plugins.oneInch,chain])
     const getCustomTokens = async ()=>{
       await Web3Api.account.getTokenBalances({address:localStorage.getItem('address'),chain}).then((tokens)=> setCustomTokens(tokens))
     }
@@ -39,49 +41,59 @@ function App() {
       return {...customTokens,...tokenList}
     },[customTokens,tokenList])
     
-    const getPriceFromToken = async () =>{
-      if(!fromToken) return null;
+    useEffect(()=>{
+      if(!fromToken){
+        return
+      };
       const addressToken = fromToken["address"] || fromToken["token_address"]
-      fetchTokenPrice({params:{address: addressToken, chain}}).then((e)=> console.log(e))
+      Web3Api.token.getTokenPrice({address:addressToken}).then((price) => {
+        setTokenPricesUSD({
+          ...tokenPricesUSD,
+          [fromToken["address"]] : price["usdPrice"]
+        })
+      })
+    },[Web3Api,fromToken])
+
+    useEffect(()=>{
+      if(!toToken){
+        return
+      };
+      const addressToken = toToken["address"] || toToken["token_address"]
+      Web3Api.token.getTokenPrice({address:addressToken}).then((price) => {
+        setTokenPricesUSD({
+          ...tokenPricesUSD,
+          [toToken["address"]] : price["usdPrice"]
+        })
+      })
+    },[Web3Api,toToken])
+
+    const fromTokenPriceUsd = useMemo(()=>{
+        if(!fromToken) return null
+        return tokenPricesUSD[fromToken["address"]]
+    },[tokenPricesUSD,fromToken]);
+
+    const toTokenPriceUsd = useMemo(
+    ()=> {
+     if(!toToken) return null
+     return tokenPricesUSD[toToken["address"]]
+    },[tokenPricesUSD,toToken])
+
+    const fromTokenAmountUsd = useMemo(()=>{
+      if(!fromTokenPriceUsd || !fromAmount) return null;
+      return `~$ ${(fromAmount * fromTokenPriceUsd).toFixed(4)}`
+    },[fromTokenPriceUsd,fromAmount])
+
+    // const toTokenAmountUsd = useMemo(()=>{
+    //   if(!toTokenPriceUsd || !quote) return null;
+    //   return `~$ ${(
+    //     Moralis?.Units?.FromWei(quote?.toTokenAmount)
+    //   )}`
+    // },[toTokenPriceUsd,quote])
+
+
+    const handleChange = (event) => {
+      setFromAmount(event.target.value)
     }
-    // useEffect(() =>{
-    //   if(!fromToken) return null;
-    //   const addressToken = fromToken["address"] || fromToken["token_address"]
-    //   fetchTokenPrice({
-    //     params:{address:addressToken, chain},
-    //     onSuccess: (price) => {
-    //       setTokenPricesUSD({
-    //         ...tokenPricesUSD,
-    //         [fromToken["address"]] : price["usdPrice"]
-    //       })
-    //     }
-    //   })
-    // },[fromToken])
-    const getPriceToToken = async () =>{
-      if(!toToken) return null;
-      fetchTokenPrice({params:{address:toToken["address"], chain}})
-      .then((price)=>setTokenPricesUSD({
-        ...tokenPricesUSD,
-        [toToken["address"]]: price["usdPrice"],
-      }))
-    }
-
-    const fromTokenPriceUsd = useMemo(
-      ()=>
-      tokenPricesUSD
-    ,[tokenPricesUSD,fromToken])
-
-    // const toTokenPriceUsd = useMemo(
-    // ()=> 
-    //   tokenPricesUSD["toToken"]["address"]
-    // ,[tokenPricesUSD])
-
-    // const fromTokenAmountUsd = useMemo(()=>{
-    //   if(!fromTokenPriceUsd || !fromAmount) return null;
-    //   return `~$ ${(fromAmount * fromTokenPriceUsd).toFixed(4)}`
-    // },[fromTokenPriceUsd,fromAmount])
-
-    
 
     const login = async (wallet : any) => {
       
@@ -93,7 +105,6 @@ function App() {
         })
           .then(function (user) {
             localStorage.setItem('address',user!.get("ethAddress"));
-            getToken()
             getCustomTokens()
           })
           .catch(function (error) {
@@ -104,7 +115,25 @@ function App() {
     const logOut = async () => {
       await logout();
       localStorage.removeItem('address');
-      console.log("logged out");
+    }
+
+    const PriceSwap = () =>{
+      const Quote = quote;
+      if(!Quote || !fromToken || !toToken) return null;
+      console.log(Quote);
+      const {fromTokenAmount,toTokenAmount} = Quote;
+      const {symbol: fromSymbol} = fromToken;
+      const {symbol: toSymbol} = toToken;
+      const pricePerToken = parseFloat(
+        tokenValue(fromTokenAmount,fromToken["decimals"]/
+        tokenValue(toTokenAmount,toToken["decimals"])),
+      ).toFixed(6)
+      return (
+        <Text>
+          Price: {" "}
+          <Text>{`1 ${toSymbol} = ${pricePerToken} ${fromSymbol} ($${tokenPricesUSD[toToken["address"]]})`}</Text>
+        </Text>  
+      )
     }
   return (
     <Container background="blue.800" rounded="lg" paddingBlockEnd="10px" boxShadow="lg">
@@ -165,7 +194,7 @@ function App() {
             <Text>From</Text>
           )}
           <InputGroup>
-          <Input value={fromAmount} onChange={()=> getPriceFromToken} fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5"/>
+          <Input value={fromAmount} onChange={handleChange} fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5"/>
           <Button onClick={() => setFromTokenActive(true)}>{fromToken ? (
             <Image
               src={fromToken["logoURI"] ||
@@ -184,6 +213,9 @@ function App() {
           )}          
           <ChevronDownIcon w="6" h="6"/></Button>
           </InputGroup>
+          <Text style={{ fontWeight: "600" }}>
+                {fromTokenAmountUsd}
+          </Text>
           <Modal isOpen={isFromTokenActive} onClose={() => setFromTokenActive(false)} size="xl">
           <ModalOverlay />
           <ModalContent>
@@ -270,7 +302,7 @@ function App() {
               </Box>
               <Spacer />
               <Box>
-                <Text fontWeight="bold">{`1 ${toToken["symbol"]} = 0.000001 ${fromToken["symbol"]}`}</Text>
+                <PriceSwap/>
               </Box>
           </Flex>
           </>
