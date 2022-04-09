@@ -83,13 +83,22 @@ function App() {
       return `~$ ${(fromAmount * fromTokenPriceUsd).toFixed(4)}`
     },[fromTokenPriceUsd,fromAmount])
 
-    // const toTokenAmountUsd = useMemo(()=>{
-    //   if(!toTokenPriceUsd || !quote) return null;
-    //   return `~$ ${(
-    //     Moralis?.Units?.FromWei(quote?.toTokenAmount)
-    //   )}`
-    // },[toTokenPriceUsd,quote])
+    const toTokenAmountUsd = useMemo(()=>{
+      if(!toTokenPriceUsd || !quote) return null;
+      return `~$ ${(
+        Moralis?.Units?.FromWei(quote["toTokenAmount"])
+      )}`
+    },[toTokenPriceUsd,quote])
+    // useEffect(()=>{
+    //   if(!tokens || fromToken) return;
+    //   setFromToken({"0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"})
+    // },[tokens,fromToken])
 
+    // useEffect(()=>{
+    //   if(fromToken && toToken && fromAmount){
+    //     setCurrentTrade({fromToken,toToken,fromAmount,chain})
+    //   }
+    // },[fromToken,toToken,fromAmount,chain])
 
     const handleChange = (event) => {
       setFromAmount(event.target.value)
@@ -307,7 +316,12 @@ function App() {
           </Flex>
           </>
         )}
-        <Button colorScheme="blue" w="100%" size="lg" marginTop="20px">Swap</Button>
+        {isAuthenticated ? (
+            <Button colorScheme="blue" w="100%" size="lg" marginTop="20px">{!fromAmount ? "Enter an Amount" : "Swap"}</Button>
+          ) : (
+            <Button colorScheme="blue" w="100%" size="lg" marginTop="20px" onClick={onOpen}>Connect Wallet</Button>
+          )}
+        
       </div>
     </Container>
   );
