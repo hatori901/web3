@@ -15,7 +15,7 @@ const theme  = extendTheme({
 ReactDOM.render(
   <React.StrictMode>
     <ChakraProvider theme={theme}>
-      <MoralisProvider serverUrl="https://rsew1xz3jitb.usemoralis.com:2053/server" appId="MJt0iT3DxF7ZQVnZq3XTWfx0HJYCn5s6bUVwzMmU">
+      <MoralisProvider serverUrl="https://wjqhhlvdgol0.usemoralis.com:2053/server" appId="tdwWkuiiWSeYIYznpPft9Qi8DJ8968S1qCFo436h">
       <App />
       </MoralisProvider>
     </ChakraProvider>

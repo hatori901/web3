@@ -10,20 +10,25 @@ import { tokenValue } from "./helpers/formatters";
 import { log } from 'console';
 
 
+const nativeAddress = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+const IsNative = (address) =>
+  address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
 function App() {
     const [customTokens,setCustomTokens] = useState({});
     const chain = "eth"
-    // const { trySwap, tokenList, getQuote } = useInchDex("eth");
+    const { trySwap, getQuote } = useInchDex(chain);
     const { Moralis,isInitialized,chainId,authenticate, isAuthenticated, isAuthenticating, user, account, logout } = useMoralis();
     const Web3Api = useMoralisWeb3Api();
     const {isOpen,onOpen,onClose} = useDisclosure();
     const [isFromTokenActive,setFromTokenActive] = useState(false);
     const [isToTokenActive,setToTokenActive] = useState(false);
-    const [fromToken, setFromToken] = useState();
-    const [toToken, setToToken] = useState();
+    const [fromToken, setFromToken] = useState(undefined);
+    const [toToken, setToToken] = useState(undefined);
     const [fromAmount, setFromAmount] = useState(0);
-    const [quote, setQuote] = useState();
-    const [currentTrade, setCurrentTrade] = useState();
+    const [quote, setQuote] = useState(undefined);
+    const [currentTrade, setCurrentTrade] = useState(undefined);
     const [tokenPricesUSD, setTokenPricesUSD] = useState({});
     const { fetchTokenPrice, data: formattedData, error, isLoading, isFetching } = useTokenPrice({ address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", chain });
     const [tokenList,setTokenList] = useState({});
@@ -34,6 +39,9 @@ function App() {
         }
         Moralis.Plugins.oneInch.getSupportedTokens({chain}).then((tokens)=> setTokenList(tokens.tokens))
     },[Moralis,Moralis.Plugins,Moralis.Plugins.oneInch,chain])
+    // const getTokenList = async () =>{
+    //   Moralis.Plugins.oneInch.getSupportedTokens({chain}).then((tokens)=> setTokenList(tokens.tokens))
+    // }
     const getCustomTokens = async ()=>{
       await Web3Api.account.getTokenBalances({address:localStorage.getItem('address'),chain}).then((tokens)=> setCustomTokens(tokens))
     }
@@ -46,26 +54,32 @@ function App() {
         return
       };
       const addressToken = fromToken["address"] || fromToken["token_address"]
-      Web3Api.token.getTokenPrice({address:addressToken}).then((price) => {
-        setTokenPricesUSD({
-          ...tokenPricesUSD,
-          [fromToken["address"]] : price["usdPrice"]
-        })
+      fetchTokenPrice({
+        params: {chain: chain, address: addressToken},
+        onSuccess: (price)=>{
+          setTokenPricesUSD({
+            ...tokenPricesUSD,
+            [fromToken["address"]] : price["usdPrice"]
+          })
+        }
       })
-    },[Web3Api,fromToken])
+    },[fromToken])
 
     useEffect(()=>{
       if(!toToken){
         return
       };
       const addressToken = toToken["address"] || toToken["token_address"]
-      Web3Api.token.getTokenPrice({address:addressToken}).then((price) => {
-        setTokenPricesUSD({
-          ...tokenPricesUSD,
-          [toToken["address"]] : price["usdPrice"]
-        })
+      fetchTokenPrice({
+        params: {chain: chain, address: addressToken},
+        onSuccess: (price)=>{
+          setTokenPricesUSD({
+            ...tokenPricesUSD,
+            [toToken["address"]] : price["usdPrice"]
+          })
+        }
       })
-    },[Web3Api,toToken])
+    },[toToken])
 
     const fromTokenPriceUsd = useMemo(()=>{
         if(!fromToken) return null
@@ -85,20 +99,18 @@ function App() {
 
     const toTokenAmountUsd = useMemo(()=>{
       if(!toTokenPriceUsd || !quote) return null;
-      return `~$ ${(
-        Moralis?.Units?.FromWei(quote["toTokenAmount"])
-      )}`
+      return `~$ ${(parseFloat(Moralis?.Units?.FromWei(quote?.toTokenAmount, quote?.toToken?.decimals)) * toTokenPriceUsd).toFixed(4)}`;
     },[toTokenPriceUsd,quote])
-    // useEffect(()=>{
-    //   if(!tokens || fromToken) return;
-    //   setFromToken({"0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"})
-    // },[tokens,fromToken])
 
-    // useEffect(()=>{
-    //   if(fromToken && toToken && fromAmount){
-    //     setCurrentTrade({fromToken,toToken,fromAmount,chain})
-    //   }
-    // },[fromToken,toToken,fromAmount,chain])
+
+    useEffect(() => {
+      if(fromToken && toToken && fromAmount)
+        setCurrentTrade({fromToken, toToken,fromAmount,chain})
+    }, [toToken, fromToken, fromAmount, chain]);
+
+    useEffect(()=>{
+      if(currentTrade) getQuote(currentTrade).then((quote)=> setQuote(quote))
+    },[currentTrade])
 
     const handleChange = (event) => {
       setFromAmount(event.target.value)
@@ -128,20 +140,14 @@ function App() {
 
     const PriceSwap = () =>{
       const Quote = quote;
-      if(!Quote || !fromToken || !toToken) return null;
-      console.log(Quote);
+      if(!Quote || !tokenPricesUSD[toToken["address"]]) return null
       const {fromTokenAmount,toTokenAmount} = Quote;
       const {symbol: fromSymbol} = fromToken;
       const {symbol: toSymbol} = toToken;
-      const pricePerToken = parseFloat(
-        tokenValue(fromTokenAmount,fromToken["decimals"]/
-        tokenValue(toTokenAmount,toToken["decimals"])),
-      ).toFixed(6)
+      const pricePerToken = (tokenValue(fromTokenAmount,fromToken["decimals"]) / tokenValue(toTokenAmount,toToken["decimals"])).toFixed(6)
+      
       return (
-        <Text>
-          Price: {" "}
-          <Text>{`1 ${toSymbol} = ${pricePerToken} ${fromSymbol} ($${tokenPricesUSD[toToken["address"]]})`}</Text>
-        </Text>  
+          <Text>{`1 ${toSymbol}  = ${pricePerToken} ${fromSymbol} ($${tokenPricesUSD[toToken["address"]].toFixed(4)})`}</Text>
       )
     }
   return (
@@ -258,7 +264,16 @@ function App() {
               <Text>To</Text>
             )}
           <InputGroup>
-            <Input fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5"/>
+            <Input fontWeight="bold" type="number" placeholder="0.00" variant="unstyled" fontSize="20px" paddingInline="5" readOnly value={
+              quote
+              ? parseFloat(
+                Moralis?.Units?.FromWei(
+                  quote?.toTokenAmount,
+                  quote?.toToken?.decimals
+                )
+              ).toFixed(6)
+              : ""
+            }/>
             <Button onClick={() => setToTokenActive(true)}>{toToken ? (
             <Image
               src={toToken["logoURI"] ||
@@ -277,7 +292,9 @@ function App() {
           )}
           <ChevronDownIcon w="6" h="6"/></Button>
           </InputGroup>
-          
+          <Text style={{ fontWeight: "600" }}>
+                {toTokenAmountUsd}
+          </Text>
           <Modal isOpen={isToTokenActive} onClose={() => setToTokenActive(false)} size="xl">
             <ModalOverlay />
             <ModalContent>
@@ -296,15 +313,17 @@ function App() {
         </Container>
         {fromToken && toToken && (
           <>
-            <Flex alignItems="center" px="4px" my="5px">
+            {quote && (
+              <Flex alignItems="center" px="4px" my="5px">
               <Box>
                 <Text fontWeight="bold" fontSize="lg">Estimated Gas :</Text>
               </Box>
               <Spacer />
               <Box>
-                <Text fontWeight="bold">12410240</Text>
+                <Text fontWeight="bold">{quote?.estimatedGas}</Text>
               </Box>
             </Flex>
+            )}
              <Flex alignItems="center" px="4px" my="5px">
               <Box>
                 <Text fontWeight="bold" fontSize="lg">Price :</Text>
