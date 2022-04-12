@@ -26,7 +26,7 @@ const useInchDex = (chain) => {
         .hasAllowance({
           chain, // The blockchain you want to use (eth/bsc/polygon)
           fromTokenAddress: fromToken.address, // The token you want to swap
-          fromAddress: account, // Your wallet address
+          fromAddress: localStorage.getItem('address'), // Your wallet address
           amount,
         })
         .then(async (allowance) => {
@@ -35,7 +35,7 @@ const useInchDex = (chain) => {
             await Moralis.Plugins.oneInch.approve({
               chain, // The blockchain you want to use (eth/bsc/polygon)
               tokenAddress: fromToken.address, // The token you want to swap
-              fromAddress: account, // Your wallet address
+              fromAddress: localStorage.getItem('address'), // Your wallet address
             });
           }
         })
@@ -61,7 +61,7 @@ const useInchDex = (chain) => {
         params.fromAmount,
         params.fromToken.decimals,
       ).toString(),
-      fromAddress: account, // Your wallet address
+      fromAddress: localStorage.getItem('address'), // Your wallet address
       slippage: 1,
     });
   }

@@ -336,7 +336,17 @@ function App() {
           </>
         )}
         {isAuthenticated ? (
-            <Button colorScheme="blue" w="100%" size="lg" marginTop="20px">{!fromAmount ? "Enter an Amount" : "Swap"}</Button>
+            <>{fromAmount
+              ? (
+                <Button colorScheme="blue" w="100%" size="lg" marginTop="20px" onClick={()=> trySwap(currentTrade)}>Swap</Button>
+              )
+              : (
+              <Button colorScheme="blue" w="100%" size="lg" marginTop="20px" disabled>Enter an Amount</Button>
+              )
+
+            }
+
+            </>
           ) : (
             <Button colorScheme="blue" w="100%" size="lg" marginTop="20px" onClick={onOpen}>Connect Wallet</Button>
           )}
